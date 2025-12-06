@@ -168,6 +168,9 @@ app.get("/health", (req, res) => {
 // 取得全台天氣預報
 app.get("/api/weather/all", getAllWeather);
 
+// 舊路徑相容性（指向相同功能）
+app.get("/api/weather/kaohsiung", getAllWeather);
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Error:", err.stack);
