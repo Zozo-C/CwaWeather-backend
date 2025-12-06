@@ -130,6 +130,8 @@ const getKaohsiungWeather = async (req, res) => {
 app.get("/", (req, res) => {
   res.json({
     message: "歡迎使用 CWA 天氣預報 API",
+    version: "1.0.0",
+    status: "running",
     endpoints: {
       kaohsiung: "/api/weather/kaohsiung",
       health: "/api/health",
@@ -137,8 +139,21 @@ app.get("/", (req, res) => {
   });
 });
 
+// 健康檢查端點（部署平台常用）
 app.get("/api/health", (req, res) => {
-  res.json({ status: "OK", timestamp: new Date().toISOString() });
+  res.json({ 
+    status: "OK", 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+// 根路徑的健康檢查（備用）
+app.get("/health", (req, res) => {
+  res.json({ 
+    status: "OK", 
+    timestamp: new Date().toISOString() 
+  });
 });
 
 // 取得高雄天氣預報
@@ -146,21 +161,24 @@ app.get("/api/weather/kaohsiung", getKaohsiungWeather);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error("Error:", err.stack);
   res.status(500).json({
     error: "伺服器錯誤",
-    message: err.message,
+    message: process.env.NODE_ENV === "production" ? "發生錯誤" : err.message,
   });
 });
 
-// 404 handler
+// 404 handler - 必須放在最後
 app.use((req, res) => {
   res.status(404).json({
     error: "找不到此路徑",
+    requestedPath: req.path,
+    method: req.method,
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 伺服器運行已運作`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 伺服器運行於 http://0.0.0.0:${PORT}`);
   console.log(`📍 環境: ${process.env.NODE_ENV || "development"}`);
+  console.log(`⏰ 啟動時間: ${new Date().toISOString()}`);
 });
