@@ -16,11 +16,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /**
- * 取得高雄天氣預報
+ * 取得全台天氣預報
  * CWA 氣象資料開放平臺 API
  * 使用「一般天氣預報-今明 36 小時天氣預報」資料集
  */
-const getKaohsiungWeather = async (req, res) => {
+const getAllWeather = async (req, res) => {
   try {
     // 檢查是否有設定 API Key
     if (!CWA_API_KEY) {
@@ -32,38 +32,44 @@ const getKaohsiungWeather = async (req, res) => {
 
     // 呼叫 CWA API - 一般天氣預報（36小時）
     // API 文件: https://opendata.cwa.gov.tw/dist/opendata-swagger.html
+    // 不指定 locationName 即可取得全台資料
     const response = await axios.get(
       `${CWA_API_BASE_URL}/v1/rest/datastore/F-C0032-001`,
       {
         params: {
           Authorization: CWA_API_KEY,
-          locationName: "--",
         },
       }
     );
 
-    // 取得高雄市的天氣資料
-    const locationData = response.data.records.location[0];
+    // 取得全台所有縣市的天氣資料
+    const allLocations = response.data.records.location;
 
-    if (!locationData) {
+    if (!allLocations || allLocations.length === 0) {
       return res.status(404).json({
         error: "查無資料",
-        message: "無法取得高雄市天氣資料",
+        message: "無法取得天氣資料",
       });
     }
 
-    // 整理天氣資料
-    const weatherData = {
-      city: locationData.locationName,
+    // 整理全台天氣資料
+    const allWeatherData = {
       updateTime: response.data.records.datasetDescription,
-      forecasts: [],
+      cities: [],
     };
 
-    // 解析天氣要素
-    const weatherElements = locationData.weatherElement;
-    const timeCount = weatherElements[0].time.length;
+    // 遍歷每個縣市
+    allLocations.forEach((locationData) => {
+      const cityWeatherData = {
+        city: locationData.locationName,
+        forecasts: [],
+      };
 
-    for (let i = 0; i < timeCount; i++) {
+      // 解析天氣要素
+      const weatherElements = locationData.weatherElement;
+      const timeCount = weatherElements[0].time.length;
+
+      for (let i = 0; i < timeCount; i++) {
       const forecast = {
         startTime: weatherElements[0].time[i].startTime,
         endTime: weatherElements[0].time[i].endTime,
@@ -99,12 +105,15 @@ const getKaohsiungWeather = async (req, res) => {
         }
       });
 
-      weatherData.forecasts.push(forecast);
-    }
+        cityWeatherData.forecasts.push(forecast);
+      }
+
+      allWeatherData.cities.push(cityWeatherData);
+    });
 
     res.json({
       success: true,
-      data: weatherData,
+      data: allWeatherData,
     });
   } catch (error) {
     console.error("取得天氣資料失敗:", error.message);
@@ -133,7 +142,7 @@ app.get("/", (req, res) => {
     version: "1.0.0",
     status: "running",
     endpoints: {
-      kaohsiung: "/api/weather/kaohsiung",
+      allWeather: "/api/weather/all",
       health: "/api/health",
     },
   });
@@ -156,8 +165,8 @@ app.get("/health", (req, res) => {
   });
 });
 
-// 取得高雄天氣預報
-app.get("/api/weather/kaohsiung", getKaohsiungWeather);
+// 取得全台天氣預報
+app.get("/api/weather/all", getAllWeather);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
